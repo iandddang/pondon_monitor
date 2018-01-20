@@ -1,20 +1,23 @@
 from bs4 import BeautifulSoup
+from settings import config
 import requests
 
-def main():
+itemDict = {}
+
+def check(pondonURL):
     ## getting html from pondonurl
-    pondonURL = 'http://www.pondonstore.com/list.php?ctg=17'
     request = requests.get(pondonURL)
 
-    itemDict = {}
+    if 'lols' in itemDict:
+        print('woo')
+    else:
+        print('nope')
+        
     soup = BeautifulSoup(request.text, "lxml")
 
     getItems(soup, itemDict, pondonURL)
-    # for entries in itemdict:
-    # for Item in itemDict:
-    #     print(Item.name + " " + Item.price + " " + Item.sizes)
-
     saveItems(itemDict)
+
 
 def saveItems(itemDict):
     # clears text file before writing
@@ -30,8 +33,9 @@ def saveItems(itemDict):
 
 def getPageNumbers(soup):
     rows = soup.find_all('div', class_='item_list_page')
-    # finds maximum amount of pages
-    pages = int(rows[0].contents[10].string)
+    # finds maximum amount of pages thru html
+    # .string pulls the content inside the tags
+    pages = int(rows[0].contents[-3].string)
     return pages
 
 def getItems(soup, itemDict, baseURL):
@@ -49,26 +53,38 @@ def getItems(soup, itemDict, baseURL):
             soup = BeautifulSoup(request.text, "lxml")
 
         rows = soup.find_all('a', class_='list_items')
+
+        # will add all items regardless if sold out or not
+        # this is useful for next iterations where it will check if items are sold out or not
         for row in rows:
-            if row.contents[7].span.contents[0] != "SOLD OUT":
-                # name of item
-                name = row.contents[7].contents[3]
-                #price of item
-                value = row.contents[7].span.contents[0]
-                value = value.replace("-","")
-                value = value.strip()
-                #sizes available
-                size = row.contents[7].contents[6].contents[0]
+            # name of item
+            name = row.contents[7].contents[3]
 
-                #link to item
-                link = row['href']
+            # when sold out indices change
+            if str(name) == "<br/>":
+                name = row.contents[7].contents[2]
 
-                #picture link
-                pictureURL = row.img['src']
-                pictureURL = 'http://www.pondonstore.com' + pictureURL[1:]
+            # no apostrophes and weirdo charcters for python
+            name = name.encode('ascii',errors='ignore').decode()
 
-                newItem = Item(name, value, size, link, pictureURL)
-                itemDict[name] = newItem
+            #price of item
+            value = row.contents[7].span.contents[0]
+            value = value.replace("-","")
+            value = value.strip()
+
+            #sizes available
+            size = row.contents[7].contents[-2].contents[0]
+            size = size.strip()
+
+            #link to item
+            link = row['href']
+
+            #picture link
+            pictureURL = row.img['src']
+            pictureURL = 'http://www.pondonstore.com' + pictureURL[1:]
+
+            newItem = Item(name, value, size, link, pictureURL)
+            itemDict[name] = newItem
 
 
 
@@ -81,4 +97,4 @@ class Item:
         self.picURL = picURL
 
 if __name__ == "__main__":
-    main()
+    check(config.baseURL)
