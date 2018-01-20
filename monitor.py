@@ -2,24 +2,92 @@ from bs4 import BeautifulSoup
 from settings import config
 import requests
 
+# global dictionary of monitor file that holds all the goodies
 itemDict = {}
 
 def check(pondonURL):
+    print("CHECK START!")
     ## getting html from pondonurl
     request = requests.get(pondonURL)
-
-    if 'lols' in itemDict:
-        print('woo')
-    else:
-        print('nope')
-        
     soup = BeautifulSoup(request.text, "lxml")
 
-    getItems(soup, itemDict, pondonURL)
-    saveItems(itemDict)
+    getItems(soup, pondonURL)
+    # saveItems()
+    print("Check end.")
+
+# this function is exactly the same as getItems except it updates values
+# will return a string for discord to print
+def update(pondonURL):
+    global itemDict
+    
+    request = requests.get(pondonURL)
+    soup = BeautifulSoup(request.text, "lxml")
+
+    # uses base URL to get max page num
+    pages = getPageNumbers(soup)
+
+    # looping through each page of the base url and adding its items
+    for pagenum in range(1,pages+1):
+
+        request = requests.get(pondonURL + "&page=" + str(pagenum))
+
+        #only recreate soup object if it is not at page 1
+        if(pagenum > 1):
+            soup = BeautifulSoup(request.text, "lxml")
+
+        rows = soup.find_all('a', class_='list_items')
+
+        # will check if item is already in dictionary and do stuff according to that
+        for row in rows:
+            # name of item
+            name = row.contents[7].contents[3]
+
+            # when sold out indices change
+            if str(name) == "<br/>":
+                name = row.contents[7].contents[2]
+
+            # no apostrophes and weirdo charcters for python
+            name = name.encode('ascii',errors='ignore').decode()
+
+            #price of item
+            value = row.contents[7].span.contents[0]
+            value = value.replace("-","")
+            value = value.strip()
+
+            #sizes available
+            sizes = row.contents[7].contents[-2].contents[0]
+            sizes = sizes.strip()
+
+            #link to item
+            link = row['href']
+
+            #picture link
+            pictureURL = row.img['src']
+            pictureURL = 'http://www.pondonstore.com' + pictureURL[1:]
 
 
-def saveItems(itemDict):
+
+            messageSent = ""
+
+            # case in which current item is already in the dictionary
+            if name in itemDict:
+                if(itemDict[name].sizes == "SOLD OUT" and sizes != "SOLD OUT"):
+                    messageSent = "RESTOCKED" + " " + name + " old size:"
+                    messageSent += itemDict[name].sizes + " new size:" + sizes
+                    # item has been restocked so update
+                    itemDict[name].sizes = sizes
+                    yield messageSent
+                else:
+                    # updates size regardless of event
+                    itemDict[name].sizes = sizes
+            else:
+                # this is a new item so add it!
+                messageSent = "New item has been added: " + name
+                newItem = Item(name, value, sizes, link, pictureURL)
+                itemDict[name] = newItem
+                yield messageSent
+
+def saveItems():
     # clears text file before writing
     open('items.txt','w').close()
 
@@ -38,8 +106,7 @@ def getPageNumbers(soup):
     pages = int(rows[0].contents[-3].string)
     return pages
 
-def getItems(soup, itemDict, baseURL):
-
+def getItems(soup, baseURL):
     # uses base URL to get max page num
     pages = getPageNumbers(soup)
 
@@ -73,8 +140,8 @@ def getItems(soup, itemDict, baseURL):
             value = value.strip()
 
             #sizes available
-            size = row.contents[7].contents[-2].contents[0]
-            size = size.strip()
+            sizes = row.contents[7].contents[-2].contents[0]
+            sizes = sizes.strip()
 
             #link to item
             link = row['href']
@@ -83,7 +150,7 @@ def getItems(soup, itemDict, baseURL):
             pictureURL = row.img['src']
             pictureURL = 'http://www.pondonstore.com' + pictureURL[1:]
 
-            newItem = Item(name, value, size, link, pictureURL)
+            newItem = Item(name, value, sizes, link, pictureURL)
             itemDict[name] = newItem
 
 
