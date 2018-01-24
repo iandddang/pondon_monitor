@@ -1,0 +1,6 @@
+[discord]
+bot_token = "your token here" (without the quotations and this)
+channel_id = "your channel id here" (without the quotations and this)
+
+[monitoring]
+baseURL = http://www.pondonstore.com/list.php?ctg=17

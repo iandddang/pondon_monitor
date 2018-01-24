@@ -27,11 +27,11 @@ async def update():
 
     while firstMonitor is True:
         await client.send_message(client.get_channel(config.channel_id), "Now searching for restocks. No commands will work.")
-        updateFxn = monitor.update(config.baseURL)
+        message = monitor.update(config.baseURL)
         # iterates through yielded values of updatefxn
         # only yields value on event
-        for event in updateFxn:
-            await client.send_message(client.get_channel(config.channel_id), event)
+        await client.send_message(client.get_channel(config.channel_id), message)
+
     else:
         await client.send_message(client.get_channel(config.channel_id),"Execute !begin first and wait for it to finish.")
         time.sleep(1)

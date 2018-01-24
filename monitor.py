@@ -1,6 +1,7 @@
 from bs4 import BeautifulSoup
 from settings import config
 import requests
+import pickle
 
 # global dictionary of monitor file that holds all the goodies
 itemDict = {}
@@ -12,14 +13,18 @@ def check(pondonURL):
     soup = BeautifulSoup(request.text, "lxml")
 
     getItems(soup, pondonURL)
-    # saveItems()
+    saveItems(itemDict)
+    # idict = loadItems()
+    # for key in idict:
+    #     itemString = idict[key].name
+    #     print(itemString)
     print("Check end.")
 
 # this function is exactly the same as getItems except it updates values
 # will return a string for discord to print
 def update(pondonURL):
-    global itemDict
-    
+    idict = loadItems()
+
     request = requests.get(pondonURL)
     soup = BeautifulSoup(request.text, "lxml")
 
@@ -61,43 +66,51 @@ def update(pondonURL):
             #link to item
             link = row['href']
 
+
+            #item id
+            itemID = link.replace("http://www.pondonstore.com/detail.php?id=", "")
+
             #picture link
             pictureURL = row.img['src']
             pictureURL = 'http://www.pondonstore.com' + pictureURL[1:]
 
 
 
+            name += itemID
             messageSent = ""
 
             # case in which current item is already in the dictionary
-            if name in itemDict:
-                if(itemDict[name].sizes == "SOLD OUT" and sizes != "SOLD OUT"):
+            if name in idict:
+                if(idict[name].sizes == "SOLD OUT" and sizes != "SOLD OUT"):
                     messageSent = "RESTOCKED" + " " + name + " old size:"
-                    messageSent += itemDict[name].sizes + " new size:" + sizes
+                    messageSent += idict[name].sizes + " new size:" + sizes
                     # item has been restocked so update
-                    itemDict[name].sizes = sizes
-                    yield messageSent
+                    idict[name].sizes = sizes
+                    saveItems(idict)
+                    return messageSent+ " " + link
                 else:
                     # updates size regardless of event
-                    itemDict[name].sizes = sizes
+                    idict[name].sizes = sizes
+                    saveItems(idict)
             else:
                 # this is a new item so add it!
                 messageSent = "New item has been added: " + name
                 newItem = Item(name, value, sizes, link, pictureURL)
-                itemDict[name] = newItem
-                yield messageSent
+                idict[name] = newItem
+                saveItems(idict)
+                return messageSent
 
-def saveItems():
-    # clears text file before writing
-    open('items.txt','w').close()
+# saves dictionary into file
+def saveItems(iDict):
+    with open('itemdictionary.pickle', 'wb') as output:
+        pickle.dump(iDict, output, protocol=pickle.HIGHEST_PROTOCOL)
 
-    # writes all objects
-    with open("items.txt", "w") as output:
-        for name in itemDict:
-            itemString = itemDict[name].name+"\t"+itemDict[name].price+"\t"
-            itemString += itemDict[name].sizes+"\t"+itemDict[name].link+"\t"
-            itemString += itemDict[name].picURL
-            output.write(itemString+"\n")
+# loads dictionary from file and returns dictionary
+def loadItems():
+    with open('itemdictionary.pickle', 'rb') as inp:
+        iDict = pickle.load(inp)
+    return iDict
+
 
 def getPageNumbers(soup):
     rows = soup.find_all('div', class_='item_list_page')
@@ -146,22 +159,28 @@ def getItems(soup, baseURL):
             #link to item
             link = row['href']
 
+            #item id
+            itemID = link.replace("http://www.pondonstore.com/detail.php?id=", "")
+            print(itemID)
+
             #picture link
             pictureURL = row.img['src']
             pictureURL = 'http://www.pondonstore.com' + pictureURL[1:]
 
-            newItem = Item(name, value, sizes, link, pictureURL)
+            name += itemID
+
+            newItem = Item(name, value, sizes, link, pictureURL, itemID)
             itemDict[name] = newItem
 
 
 
 class Item:
-    def __init__(self, name, price, sizes, link, picURL):
+    def __init__(self, name, price, sizes, link, picURL, ID):
         self.name = name
         self.price = price
         self.sizes = sizes
         self.link = link
         self.picURL = picURL
-
+        self.ID = ID
 if __name__ == "__main__":
     check(config.baseURL)
